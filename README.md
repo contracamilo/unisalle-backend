@@ -24,34 +24,100 @@ Backend REST API para la gestión de usuarios con autenticación JWT, roles y ca
 
 ## Requisitos previos
 
-- [Node.js](https://nodejs.org) ≥ 18
-- [MySQL](https://www.mysql.com) 8.x corriendo en localhost
-- [Postman](https://www.postman.com) (para pruebas)
+| Opción | Herramientas necesarias |
+|--------|------------------------|
+| **Docker** (recomendado) | [Docker Desktop](https://www.docker.com/products/docker-desktop) |
+| **Local** | [Node.js](https://nodejs.org) ≥ 18 + [MySQL](https://www.mysql.com) 8.x |
+
+[Postman](https://www.postman.com) para probar los endpoints.
 
 ---
 
-## Instalación y configuración
+## Levantar el proyecto
 
-### 1. Clonar el repositorio
+### Opción A — Docker (recomendado)
+
+No requiere tener Node.js ni MySQL instalados localmente. Docker levanta ambos servicios.
+
+**1. Clonar el repositorio**
 
 ```bash
 git clone https://github.com/contracamilo/unisalle-backend.git
 cd unisalle-backend
 ```
 
-### 2. Instalar dependencias
-
-```bash
-npm install
-```
-
-### 3. Configurar variables de entorno
+**2. Configurar variables de entorno**
 
 ```bash
 cp .env.example .env
 ```
 
-Editar `.env` con los datos de tu entorno:
+Editar `.env` y ajustar al menos estos dos valores:
+
+```env
+DB_PASSWORD=cualquier_password
+JWT_SECRET=un_string_secreto_largo
+```
+
+> `DB_HOST=db` debe quedar así — es el nombre del servicio MySQL dentro de Docker.
+
+**3. Levantar los contenedores**
+
+```bash
+docker compose up --build
+```
+
+Docker construye la imagen de la app, levanta MySQL 8, espera a que la base de datos esté lista y luego arranca el servidor. En el primer arranque crea las tablas y los roles automáticamente.
+
+**4. Verificar**
+
+```
+GET http://localhost:3000/api/health
+```
+
+Respuesta esperada:
+
+```json
+{ "ok": true, "status": "running", "timestamp": "..." }
+```
+
+**Comandos útiles**
+
+```bash
+docker compose up -d           # levantar en segundo plano
+docker compose logs -f app     # ver logs de la app en tiempo real
+docker compose logs -f db      # ver logs de MySQL
+docker compose down            # detener y eliminar contenedores
+docker compose down -v         # detener + borrar volúmenes (resetea la DB)
+```
+
+---
+
+### Opción B — Local (sin Docker)
+
+Requiere Node.js ≥ 18 y MySQL 8 corriendo en la máquina.
+
+**1. Clonar e instalar dependencias**
+
+```bash
+git clone https://github.com/contracamilo/unisalle-backend.git
+cd unisalle-backend
+npm install
+```
+
+**2. Crear la base de datos en MySQL**
+
+```sql
+CREATE DATABASE unisalle_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+**3. Configurar variables de entorno**
+
+```bash
+cp .env.example .env
+```
+
+Editar `.env` con tus credenciales locales:
 
 ```env
 PORT=3000
@@ -61,29 +127,23 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=unisalle_db
 DB_USER=root
-DB_PASSWORD=tu_password
+DB_PASSWORD=tu_password_de_mysql
 
-JWT_SECRET=cambia_este_secreto_por_uno_seguro
+JWT_SECRET=un_string_secreto_largo
 JWT_EXPIRES_IN=7d
 ```
 
-### 4. Crear la base de datos
-
-```sql
-CREATE DATABASE unisalle_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-### 5. Iniciar el servidor
+**4. Iniciar el servidor**
 
 ```bash
-# Desarrollo (hot reload)
+# Desarrollo con hot reload
 npm run dev
 
 # Producción
 npm start
 ```
 
-Al iniciar, Sequelize crea las tablas automáticamente y semilla los roles por defecto: `admin`, `user`, `moderator`.
+Al iniciar, Sequelize sincroniza las tablas y semilla los roles `admin`, `user`, `moderator` automáticamente.
 
 ---
 
@@ -394,7 +454,7 @@ if (res.token) {
 }
 ```
 
-4. En las rutas protegidas, usar `Authorization: Bearer {{token}}`.
+1. En las rutas protegidas, usar `Authorization: Bearer {{token}}`.
 
 ### Flujo de prueba sugerido
 
@@ -412,11 +472,14 @@ if (res.token) {
 El servidor escucha en `0.0.0.0`, lo que permite conexiones desde la red local.
 
 1. Obtener la IP de la máquina:
+
    ```bash
    # macOS / Linux
    ipconfig getifaddr en0
    ```
+
 2. Desde la app móvil usar:
+
    ```
    http://192.168.x.x:3000/api
    ```
