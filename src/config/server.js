@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
 
@@ -8,7 +9,14 @@ const userRoutes = require('../routes/user.routes');
 
 const app = express();
 
-// CORS — abierto para clientes móviles
+// Cabeceras de seguridad. crossOriginResourcePolicy se relaja a "cross-origin"
+// para que los <img> de la app Flutter (otro origen) puedan cargar /uploads.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// CORS — abierto para clientes móviles en dev. En prod debe restringirse
+// a dominios conocidos (ver README §CORS en producción).
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],

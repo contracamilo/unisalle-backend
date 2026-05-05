@@ -18,6 +18,8 @@ Backend REST API para la gestión de usuarios con autenticación JWT, roles y ca
 | express-validator | 7.x | Validación de entradas |
 | dotenv | 17.x | Variables de entorno |
 | cors | 2.x | Política de CORS |
+| helmet | 8.x | Cabeceras HTTP defensivas |
+| express-rate-limit | 7.x | Rate limiting en `/api/auth` |
 | morgan | 1.x | Logger HTTP |
 
 ---
@@ -501,6 +503,64 @@ Las URLs de imágenes en las respuestas ya incluyen la IP del servidor, por lo q
 | `DB_PASSWORD` | Sí | Contraseña de MySQL | `secret` |
 | `JWT_SECRET` | Sí | Clave secreta para firmar tokens | `min. 32 chars` |
 | `JWT_EXPIRES_IN` | No | Tiempo de expiración del token | `7d` |
+
+---
+
+## Seguridad
+
+| Capa | Implementación |
+|------|----------------|
+| Hash de contraseñas | bcryptjs con `saltRounds=10` |
+| JWT | Firmado HS256, expiración configurable (default 7d). Generar `JWT_SECRET` con `openssl rand -base64 64`. |
+| Cabeceras HTTP | `helmet` aplicado globalmente. `crossOriginResourcePolicy: cross-origin` para permitir que clientes externos (apps móviles) carguen `/uploads`. |
+| Rate limiting | `/api/auth/register` y `/api/auth/login` limitados a 10 intentos / 15 min por IP. |
+| Validación | `express-validator` en register y login (email válido, password ≥ 6 chars, name ≥ 2 chars). |
+| CORS | Abierto (`*`) en dev. **En producción restringir a dominios conocidos** editando `src/config/server.js`. |
+| Secrets | `.env` está en `.gitignore`. Nunca commitear el archivo. |
+
+---
+
+## Integración con la app Flutter UniSalle
+
+Este backend reemplaza el flujo de email/password del repo [`contracamilo/flutter-uns-app`](https://github.com/contracamilo/flutter-uns-app). Los flujos OAuth de Google y GitHub permanecen en Firebase.
+
+**Base URL por plataforma del cliente:**
+
+| Plataforma | URL |
+|-----------|-----|
+| Android emulator | `http://10.0.2.2:3000` |
+| iOS simulator / desktop / web | `http://localhost:3000` |
+| Dispositivo físico (LAN) | `http://<IP_LAN>:3000` (ver §Configuración para dispositivos móviles) |
+
+**Endpoints consumidos por la app:**
+
+```text
+POST   /api/auth/register        → registro + token
+POST   /api/auth/login           → login + token
+GET    /api/users/me             → restaurar sesión / perfil
+PUT    /api/users/:id/image      → cambiar foto de perfil (multipart)
+```
+
+**Ejemplo de respuesta de `/api/users/me`:**
+
+```json
+{
+  "ok": true,
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez",
+    "email": "juan@example.com",
+    "image": "http://192.168.1.10:3000/uploads/abc123.jpg",
+    "active": true,
+    "roles": ["user"],
+    "createdAt": "2026-05-03T10:00:00.000Z"
+  }
+}
+```
+
+La app Flutter persiste el `token` con `flutter_secure_storage` y lo inyecta automáticamente como `Authorization: Bearer <token>` vía interceptor de Dio.
+
+**Troubleshooting Android:** si el dispositivo físico no carga endpoints HTTP, añadir `usesCleartextTraffic="true"` o un `network_security_config.xml` que permita `cleartextTrafficPermitted="true"` para la IP del backend en dev.
 
 ---
 
